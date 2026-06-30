@@ -86,7 +86,11 @@ final class WindowController: WindowControlling {
         var windowsRef: CFTypeRef?
         AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &windowsRef)
         guard let axWindows = windowsRef as? [AXUIElement] else { return nil }
+        return axWindow(for: window, in: axWindows)
+    }
 
+    /// 在已拉取的 axWindows 列表中按帧匹配查找窗口。
+    private func axWindow(for window: WindowInfo, in axWindows: [AXUIElement]) -> AXUIElement? {
         for axWin in axWindows {
             if matches(window: window, axWindow: axWin) { return axWin }
         }
