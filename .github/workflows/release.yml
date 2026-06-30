@@ -78,3 +78,5 @@ jobs:
         with:
           files: ${{ steps.dmg.outputs.name }}
           generate_release_notes: true
+
+          
