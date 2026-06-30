@@ -60,16 +60,16 @@ final class WindowController: WindowControlling {
     }
 
     private func setFrame(_ frame: CGRect, for axWindow: AXUIElement) throws {
-        var origin = frame.origin
-        var size = frame.size
-        guard let pos = AXValueCreate(.cgPoint, &origin),
-              let sizeValue = AXValueCreate(.cgSize, &size) else {
-            throw WindowControlError.axCallFailed("AXValueCreate failed")
+        var rect = frame
+        guard let value = AXValueCreate(.cgRect, &rect) else {
+            throw WindowControlError.axCallFailed("AXValueCreate cgRect failed")
         }
-        let posErr = AXUIElementSetAttributeValue(axWindow, kAXPositionAttribute as CFString, pos)
-        let sizeErr = AXUIElementSetAttributeValue(axWindow, kAXSizeAttribute as CFString, sizeValue)
-        guard posErr == .success, sizeErr == .success else {
-            throw WindowControlError.axCallFailed("pos=\(posErr.rawValue) size=\(sizeErr.rawValue)")
+        let err = AXUIElementSetAttributeValue(
+            axWindow,
+            "AXPositionAndSize" as CFString,
+            value)
+        guard err == .success else {
+            throw WindowControlError.axCallFailed("set positionAndSize=\(err.rawValue)")
         }
     }
 
