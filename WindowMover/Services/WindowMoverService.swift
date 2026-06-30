@@ -33,21 +33,18 @@ final class WindowMoverService {
         let windows = windowEnumerator.visibleWindows()
 
         for window in windows {
-            if windowController.isFullscreen(window) {
+            let outcome = windowController.moveWindow(
+                window,
+                mode: mode,
+                targetFullFrame: display.frame,
+                targetVisibleFrame: display.visibleFrame)
+            switch outcome {
+            case .moved:
+                result.moved += 1
+            case .skipped:
                 result.skipped += 1
                 logger.info("skip fullscreen window \(window.id) (\(window.ownerName))")
-                continue
-            }
-            do {
-                let sourceFrame = windowController.currentFrame(window)
-                let targetFrame = FrameCalculator.calculateFrame(
-                    mode: mode,
-                    source: sourceFrame,
-                    targetFullFrame: display.frame,
-                    targetVisibleFrame: display.visibleFrame)
-                try windowController.setFrame(targetFrame, for: window)
-                result.moved += 1
-            } catch {
+            case .failed(let error):
                 result.failed += 1
                 logger.error("failed to move window \(window.id) (\(window.ownerName)): \(String(describing: error))")
             }
