@@ -35,16 +35,6 @@
 			path = WindowMover;
 			sourceTree = "<group>";
 		};
-		26B349082FF384D6008A256E /* WindowMoverTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = WindowMoverTests;
-			sourceTree = "<group>";
-		};
-		26B349122FF384D6008A256E /* WindowMoverUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = WindowMoverUITests;
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -70,8 +60,6 @@
 			isa = PBXGroup;
 			children = (
 				26B348FA2FF384D4008A256E /* WindowMover */,
-				26B349082FF384D6008A256E /* WindowMoverTests */,
-				26B349122FF384D6008A256E /* WindowMoverUITests */,
 				26B348F92FF384D4008A256E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -120,9 +108,6 @@
 			dependencies = (
 				26B349072FF384D6008A256E /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				26B349082FF384D6008A256E /* WindowMoverTests */,
-			);
 			name = WindowMoverTests;
 			productName = WindowMoverTests;
 			productReference = 26B349052FF384D6008A256E /* WindowMoverTests.xctest */;
@@ -140,9 +125,6 @@
 			);
 			dependencies = (
 				26B349112FF384D6008A256E /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				26B349122FF384D6008A256E /* WindowMoverUITests */,
 			);
 			name = WindowMoverUITests;
 			productName = WindowMoverUITests;
