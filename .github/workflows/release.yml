@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Show environment
+        run: |
+          xcodebuild -version
+          sw_vers
+
+      - name: Build (Release, universal, unsigned)
+        run: |
+          xcodebuild \
+            -project WindowMover.xcodeproj \
+            -scheme WindowMover \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -derivedDataPath build \
+            ARCHS="arm64 x86_64" \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
+            build
+
+      - name: Locate .app
+        id: app
+        run: |
+          APP_PATH="$(find build/Build/Products/Release -maxdepth 1 -name 'WindowMover.app' -print -quit)"
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::WindowMover.app not found"
+            exit 1
+          fi
+          echo "path=$APP_PATH" >> "$GITHUB_OUTPUT"
+          echo "Found: $APP_PATH"
+
+      - name: Create DMG
+        id: dmg
+        run: |
+          TAG="${GITHUB_REF_NAME:-dev}"
+          DMG_NAME="WindowMover-${TAG}.dmg"
+          STAGING="dmg-staging"
+          mkdir -p "$STAGING"
+          cp -R "${{ steps.app.outputs.path }}" "$STAGING/"
+          ln -s /Applications "$STAGING/Applications"
+          hdiutil create -volname "WindowMover" \
+            -srcfolder "$STAGING" \
+            -ov -format UDZO \
+            "$DMG_NAME"
+          echo "name=$DMG_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WindowMover-dmg
+          path: ${{ steps.dmg.outputs.name }}
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.dmg.outputs.name }}
+          generate_release_notes: true

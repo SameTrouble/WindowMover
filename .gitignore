@@ -1,0 +1,17 @@
+# Superpowers
+.superpowers/
+
+# macOS
+.DS_Store
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad/
+*.swp
+~$*
+
+# Build output
+build/
+DerivedData/
+*.xcscmblueprint
