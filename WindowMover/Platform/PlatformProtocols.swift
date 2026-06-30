@@ -10,11 +10,12 @@ enum WindowMoveOutcome {
 }
 
 protocol WindowControlling {
-    /// 在一次 AX 窗口查找内完成：全屏判断 → 读源 frame → 计算目标 frame → 设置。
-    func moveWindow(_ window: WindowInfo,
-                    mode: MoveMode,
-                    targetFullFrame: CGRect,
-                    targetVisibleFrame: CGRect) -> WindowMoveOutcome
+    /// 移动一组同 PID 的窗口。组内串行；调用方负责保证跨组并发。
+    /// 组内只做一次 AXUIElementCreateApplication + kAXWindowsAttribute 拉取，组内各窗口复用该列表。
+    nonisolated func moveWindows(_ windows: [WindowInfo],
+                     mode: MoveMode,
+                     targetFullFrame: CGRect,
+                     targetVisibleFrame: CGRect) -> [(window: WindowInfo, outcome: WindowMoveOutcome)]
 }
 
 protocol WindowEnumerating {

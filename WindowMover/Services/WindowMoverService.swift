@@ -23,32 +23,41 @@ final class WindowMoverService {
         self.logger = logger
     }
 
-    func moveAllWindows(to display: Display, mode: MoveMode) -> MoveResult {
+    nonisolated func moveAllWindows(to display: Display, mode: MoveMode) async -> MoveResult {
         guard screenObserver.displays.contains(where: { $0.id == display.id }) else {
             logger.warning("target display \(display.id) not present; no-op")
             return MoveResult()
         }
 
-        var result = MoveResult()
         let windows = windowEnumerator.visibleWindows()
+        let groups = Dictionary(grouping: windows, by: { $0.ownerPID })
 
-        for window in windows {
-            let outcome = windowController.moveWindow(
-                window,
-                mode: mode,
-                targetFullFrame: display.frame,
-                targetVisibleFrame: display.visibleFrame)
-            switch outcome {
-            case .moved:
-                result.moved += 1
-            case .skipped:
-                result.skipped += 1
-                logger.info("skip fullscreen window \(window.id) (\(window.ownerName))")
-            case .failed(let error):
-                result.failed += 1
-                logger.error("failed to move window \(window.id) (\(window.ownerName)): \(String(describing: error))")
+        return await withTaskGroup(of: [(window: WindowInfo, outcome: WindowMoveOutcome)].self) { group in
+            for (_, groupWindows) in groups {
+                group.addTask {
+                    return self.windowController.moveWindows(
+                        groupWindows,
+                        mode: mode,
+                        targetFullFrame: display.frame,
+                        targetVisibleFrame: display.visibleFrame)
+                }
             }
+            var result = MoveResult()
+            for await groupOutcomes in group {
+                for (window, outcome) in groupOutcomes {
+                    switch outcome {
+                    case .moved:
+                        result.moved += 1
+                    case .skipped:
+                        result.skipped += 1
+                        logger.info("skip fullscreen window \(window.id) (\(window.ownerName))")
+                    case .failed(let error):
+                        result.failed += 1
+                        logger.error("failed to move window \(window.id) (\(window.ownerName)): \(String(describing: error))")
+                    }
+                }
+            }
+            return result
         }
-        return result
     }
 }

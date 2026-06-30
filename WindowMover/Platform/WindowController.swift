@@ -14,32 +14,52 @@ final class WindowController: WindowControlling {
         self.logger = logger
     }
 
-    func moveWindow(_ window: WindowInfo,
-                    mode: MoveMode,
-                    targetFullFrame: CGRect,
-                    targetVisibleFrame: CGRect) -> WindowMoveOutcome {
-        guard let axWindow = axWindow(for: window) else {
-            return .failed(WindowControlError.axElementNotFound)
+    nonisolated func moveWindows(_ windows: [WindowInfo],
+                     mode: MoveMode,
+                     targetFullFrame: CGRect,
+                     targetVisibleFrame: CGRect) -> [(window: WindowInfo, outcome: WindowMoveOutcome)] {
+        guard let pid = windows.first?.ownerPID else { return [] }
+
+        let app = AXUIElementCreateApplication(pid)
+        var windowsRef: CFTypeRef?
+        AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &windowsRef)
+        guard let axWindows = windowsRef as? [AXUIElement] else {
+            return windows.map { ($0, .failed(WindowControlError.axElementNotFound)) }
         }
 
-        if isFullscreen(axWindow) { return .skipped }
+        var results: [(window: WindowInfo, outcome: WindowMoveOutcome)] = []
+        results.reserveCapacity(windows.count)
 
-        guard let sourceFrame = currentFrame(axWindow) else {
-            return .failed(WindowControlError.axCallFailed("read source frame"))
+        for window in windows {
+            guard let axWin = axWindow(for: window, in: axWindows) else {
+                results.append((window, .failed(WindowControlError.axElementNotFound)))
+                continue
+            }
+
+            if isFullscreen(axWin) {
+                results.append((window, .skipped))
+                continue
+            }
+
+            guard let sourceFrame = currentFrame(axWin) else {
+                results.append((window, .failed(WindowControlError.axCallFailed("read source frame"))))
+                continue
+            }
+
+            let target = FrameCalculator.calculateFrame(
+                mode: mode,
+                source: sourceFrame,
+                targetFullFrame: targetFullFrame,
+                targetVisibleFrame: targetVisibleFrame)
+
+            do {
+                try setFrame(target, for: axWin)
+                results.append((window, .moved))
+            } catch {
+                results.append((window, .failed(error)))
+            }
         }
-
-        let target = FrameCalculator.calculateFrame(
-            mode: mode,
-            source: sourceFrame,
-            targetFullFrame: targetFullFrame,
-            targetVisibleFrame: targetVisibleFrame)
-
-        do {
-            try setFrame(target, for: axWindow)
-            return .moved
-        } catch {
-            return .failed(error)
-        }
+        return results
     }
 
     private func isFullscreen(_ axWindow: AXUIElement) -> Bool {
@@ -79,15 +99,6 @@ final class WindowController: WindowControlling {
     }
 
     // MARK: - AX window lookup
-
-    /// Find the AXUIElement for a window by matching its CGWindowID against the owning app's windows.
-    private func axWindow(for window: WindowInfo) -> AXUIElement? {
-        let app = AXUIElementCreateApplication(window.ownerPID)
-        var windowsRef: CFTypeRef?
-        AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &windowsRef)
-        guard let axWindows = windowsRef as? [AXUIElement] else { return nil }
-        return axWindow(for: window, in: axWindows)
-    }
 
     /// 在已拉取的 axWindows 列表中按帧匹配查找窗口。
     private func axWindow(for window: WindowInfo, in axWindows: [AXUIElement]) -> AXUIElement? {
