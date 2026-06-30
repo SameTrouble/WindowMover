@@ -16,6 +16,10 @@ final class WindowController: WindowControlling {
 
     func isFullscreen(_ window: WindowInfo) -> Bool {
         guard let axWindow = axWindow(for: window) else { return false }
+        return isFullscreen(axWindow)
+    }
+
+    private func isFullscreen(_ axWindow: AXUIElement) -> Bool {
         var value: CFTypeRef?
         let err = AXUIElementCopyAttributeValue(axWindow, "AXFullScreen" as CFString, &value)
         guard err == .success, let flag = value as? Bool else { return false }
@@ -24,12 +28,16 @@ final class WindowController: WindowControlling {
 
     func currentFrame(_ window: WindowInfo) -> CGRect {
         guard let axWindow = axWindow(for: window) else { return window.frame }
+        return currentFrame(axWindow) ?? window.frame
+    }
+
+    private func currentFrame(_ axWindow: AXUIElement) -> CGRect? {
         var positionRef: CFTypeRef?
         var sizeRef: CFTypeRef?
         AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &positionRef)
         AXUIElementCopyAttributeValue(axWindow, kAXSizeAttribute as CFString, &sizeRef)
-        let origin = CGPoint(from: positionRef) ?? .zero
-        let size = CGSize(from: sizeRef) ?? .zero
+        guard let origin = CGPoint(from: positionRef),
+              let size = CGSize(from: sizeRef) else { return nil }
         return CGRect(origin: origin, size: size)
     }
 
