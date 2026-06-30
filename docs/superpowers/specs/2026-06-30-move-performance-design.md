@@ -69,7 +69,9 @@ protocol WindowControlling {
 2. 查 `AXFullScreen` → true 则返回 `.skipped`
 3. 读 `kAXPosition` + `kAXSize` 得 sourceFrame；失败返回 `.failed`
 4. 调 `FrameCalculator.calculateFrame(mode:source:targetFullFrame:targetVisibleFrame:)` 得 targetFrame
-5. 用 `kAXPositionAndSizeAttribute` **单次** `SetAttribute` 设置目标 frame；成功 `.moved`，失败 `.failed`
+5. 设置目标 frame——position 与 size 分两次 `SetAttribute`（用 `guard let` 解包 `AXValueCreate` 返回值，消除强制解包）；成功 `.moved`，失败 `.failed`
+
+> 注：设计初稿曾计划用 `kAXPositionAndSizeAttribute` 单次调用合并设置。但该属性在 Swift 中不可用（C 桥接常量未导出），改用字符串字面量 `"AXPositionAndSize"` 后运行时报 `AXError.cannotComplete` (-25205)——该属性对标准应用窗口不支持写入。因此回退到 `kAXPosition` + `kAXSize` 两次 `SetAttribute`，但保留 `guard let` 消除强制解包。设置阶段仍为 2 次 IPC，但主要优化（消除 3 次重复 `axWindow(for:)` 查找 → 1 次）成立，这是 AX IPC 的大头。
 
 ```swift
 func moveWindow(_ window: WindowInfo,
@@ -109,27 +111,32 @@ func moveWindow(_ window: WindowInfo,
 
 `axWindow(for window: WindowInfo) -> AXUIElement?` 保持不变（仍按 PID + 帧匹配查找）。
 
-#### 设置阶段合并
+#### 设置阶段
 
-`setFrame` 内用 `kAXPositionAndSizeAttribute` 单次调用替代当前的 position + size 两次 `SetAttribute`：
+`setFrame` 用 `kAXPositionAttribute` + `kAXSizeAttribute` 两次 `SetAttribute`（与优化前一致），但用 `guard let` 解包 `AXValueCreate` 返回值，消除原 `pos!` / `sizeValue!` 强制解包的崩溃风险：
 
 ```swift
 private func setFrame(_ frame: CGRect, for axWindow: AXUIElement) throws {
-    var rect = frame
-    guard let value = AXValueCreate(.cgRect, &rect) else {
-        throw WindowControlError.axCallFailed("AXValueCreate cgRect failed")
+    var origin = frame.origin
+    var size = frame.size
+    guard let posValue = AXValueCreate(.cgPoint, &origin) else {
+        throw WindowControlError.axCallFailed("AXValueCreate cgPoint failed")
     }
-    let err = AXUIElementSetAttributeValue(
-        axWindow,
-        kAXPositionAndSizeAttribute as CFString,
-        value)
-    guard err == .success else {
-        throw WindowControlError.axCallFailed("set positionAndSize=\(err.rawValue)")
+    guard let sizeValue = AXValueCreate(.cgSize, &size) else {
+        throw WindowControlError.axCallFailed("AXValueCreate cgSize failed")
+    }
+    let posErr = AXUIElementSetAttributeValue(axWindow, kAXPositionAttribute as CFString, posValue)
+    guard posErr == .success else {
+        throw WindowControlError.axCallFailed("set position=\(posErr.rawValue)")
+    }
+    let sizeErr = AXUIElementSetAttributeValue(axWindow, kAXSizeAttribute as CFString, sizeValue)
+    guard sizeErr == .success else {
+        throw WindowControlError.axCallFailed("set size=\(sizeErr.rawValue)")
     }
 }
 ```
 
-注意：`AXValueCreate(.cgRect, &rect)` 需要 `import CoreGraphics`（已有）且 `CGRect` 可作为 `AXValue` 类型 `.cgRect`。此属性为 AX 标准属性，macOS 原生窗口普遍支持；若个别窗口不支持，`SetAttribute` 返回非 `.success`，被计入 `.failed`，行为与当前一致（当前两次设置任一失败也抛错）。
+> **设计修正记录：** 初稿曾计划用 `kAXPositionAndSizeAttribute` 单次调用合并设置。实现时发现：该 Swift 符号不可用，改用字符串字面量 `"AXPositionAndSize"` 后运行时所有窗口均报 `AXError.cannotComplete` (-25205)，证明该属性对标准应用窗口不支持写入。回退到 position + size 两次设置（仍是 2 次 IPC），但消除强制解包的改进保留。设置阶段未实现 IPC 降低，但本优化的主要收益来自消除 3 次重复 `axWindow(for:)` 查找（降至 1 次），该项不受影响。
 
 #### 顺带修复：强制解包崩溃风险
 
@@ -167,12 +174,12 @@ for window in windows {
 |---|---|---|
 | 查找 AX 窗口（`axWindow(for:)`） | 3 次（isFullscreen / currentFrame / setFrame 各一次） | **1 次** |
 | 读 AX 属性 | 3+ 次（每次查找内含帧匹配读 2 属性 + 全屏读 1） | ~3 次（全屏 1 + 源 frame 2） |
-| 设置 AX 属性 | 2 次（position + size 分开） | **1 次**（positionAndSize 合并） |
-| **合计 AX IPC** | ~8+ 次/窗口 | ~5 次/窗口 |
+| 设置 AX 属性 | 2 次（position + size 分开） | 2 次（同前，但消除强制解包） |
+| **合计 AX IPC** | ~8+ 次/窗口 | ~6 次/窗口 |
 
 查找重复的消除还减少了帧匹配遍历：优化前每次 `axWindow(for:)` 内对每个候选 AX 窗口读 2 个属性，N 个窗口、每 app M 个候选时是 `3 × N × 2 × M` 次读；优化后降到 `N × 2 × M` 次。
 
-预计实际提速 2-3 倍，窗口数越多收益越明显。
+预计实际提速约 2 倍（设置阶段未降低，主要收益来自消除 2 次重复 `axWindow(for:)` 查找及其帧匹配遍历），窗口数越多收益越明显。
 
 ## 影响范围
 
@@ -196,5 +203,5 @@ for window in windows {
 
 ## 风险
 
-- **`kAXPositionAndSizeAttribute` 兼容性**：此为 AX 标准属性，macOS 原生窗口普遍支持。若个别窗口不支持，`SetAttribute` 返回非 `.success` 被计入 `.failed`，行为与当前两次设置任一失败一致，不会更差。
+- **设置阶段行为**：`kAXPositionAttribute` + `kAXSizeAttribute` 两次设置是 macOS 移动窗口的事实标准做法，与优化前一致，无新增风险。（曾尝试用 `AXPositionAndSize` 合并但运行时 `cannotComplete`，已回退。）
 - **行为等价性**：`moveWindow` 合并三步后，若中途某步失败（如读 sourceFrame 失败），该窗口直接 `.failed` 跳过，与当前行为一致（当前 `currentFrame` 失败返回 `.zero` 后 `calculateFrame` 会算出错误 frame 再 `setFrame`，实际更差）。优化后失败处理更早、更干净。
