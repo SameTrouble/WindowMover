@@ -186,7 +186,7 @@ for window in windows {
 | 文件 | 改动类型 |
 |---|---|
 | `WindowMover/Platform/PlatformProtocols.swift` | 改协议 + 新增 `WindowMoveOutcome` 枚举 |
-| `WindowMover/Platform/WindowController.swift` | 重写为实现 `moveWindow`，旧三方法降为 private 接收 `AXUIElement`，`setFrame` 用 `kAXPositionAndSizeAttribute`，消除强制解包 |
+| `WindowMover/Platform/WindowController.swift` | 重写为实现 `moveWindow`，旧三方法降为 private 接收 `AXUIElement`，`setFrame` 用 `kAXPosition` + `kAXSize` 两次 SetAttribute + `guard let` 消除强制解包 |
 | `WindowMover/Services/WindowMoverService.swift` | 循环体改为单步 `moveWindow` 调用，移除 `FrameCalculator` 直接依赖 |
 
 不动文件：`FrameCalculator.swift` / `WindowFilter.swift` / `WindowEnumerator.swift` / `AppState.swift` / `MenuView.swift` / `WindowMoverApp.swift` / `Models/*` / 其余 Platform 文件。
