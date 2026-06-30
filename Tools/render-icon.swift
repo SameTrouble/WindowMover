@@ -64,10 +64,7 @@ func renderPNG(from svgData: Data, pixels: Int) -> Data? {
     NSGraphicsContext.current = context
     context.imageInterpolation = .high
     svgImage.size = targetSize
-    svgImage.draw(in: NSRect(origin: .zero, size: targetSize),
-                  from: NSRect(origin: .zero, size: NSSize(width: 1024, height: 1024)),
-                  operation: .copy,
-                  fraction: 1.0)
+    svgImage.draw(in: NSRect(origin: .zero, size: targetSize))
     return bitmap.representation(using: .png, properties: [:])
 }
 

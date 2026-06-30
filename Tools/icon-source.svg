@@ -6,22 +6,10 @@
       <stop offset="100%" stop-color="#0040DD"/>
     </radialGradient>
     <filter id="monitorShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
-      <feOffset dx="0" dy="6" result="offsetblur"/>
-      <feComponentTransfer><feFuncA type="linear" slope="0.15"/></feComponentTransfer>
-      <feMerge>
-        <feMergeNode/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#000000" flood-opacity="0.15"/>
     </filter>
     <filter id="windowShadow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
-      <feOffset dx="0" dy="4" result="offsetblur"/>
-      <feComponentTransfer><feFuncA type="linear" slope="0.25"/></feComponentTransfer>
-      <feMerge>
-        <feMergeNode/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.25"/>
     </filter>
   </defs>
 
