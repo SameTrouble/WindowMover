@@ -80,7 +80,7 @@ final class AppState {
         let mode = moveMode
         let svc = service
         Task.detached(priority: .userInitiated) {
-            _ = svc.moveAllWindows(to: display, mode: mode)
+            _ = await svc.moveAllWindows(to: display, mode: mode)
             await MainActor.run { self.isMoving = false }
         }
     }
